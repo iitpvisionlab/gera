@@ -29,13 +29,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _setup_ui(self):
         self.resize(1000, 770)
-        self.setStyleSheet(
-            """QMainWindow::separator, QSplitter::handle {
+        self.setStyleSheet("""QMainWindow::separator, QSplitter::handle {
                 background:rgba(0,0,0,50);
                 width:4px;
                 height:4px;
-            } """
-        )
+            } """)
         # main_splitter splits left_frame and mdi_area
         menu_button = self._create_menu_button()
         self._mdi_area = MdiArea(self, menu_button)
