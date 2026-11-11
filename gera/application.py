@@ -33,9 +33,6 @@ def parse_args() -> Namespace:
     parser = ArgumentParser("GERA runner")
 
     parser.add_argument("files", nargs="*", help="files to open")
-    parser.add_argument(
-        "--schema",
-        choices=["ldj"],
-    )
+    parser.add_argument("--schema", choices=["ldj"], default="ldj")
 
     return parser.parse_args()
