@@ -19,6 +19,7 @@ class CustomTableView(QtWidgets.QTableView):
         )
         header = self.horizontalHeader()
         header.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        header.setSectionsMovable(True)
         header.addAction(
             QtWidgets.QAction(
                 "&Copy whole column", self, triggered=self._copy_columns
