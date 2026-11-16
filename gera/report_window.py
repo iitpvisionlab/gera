@@ -1,9 +1,41 @@
 from __future__ import annotations
 from typing import Callable
-from PyQt5 import QtCore, QtSql, QtWidgets
+from PyQt5 import QtCore, QtSql, QtGui, QtWidgets
 from .sql_text_edit import SqlTextEdit
 
 Qt = QtCore.Qt
+
+
+class GeraHeaderView(QtWidgets.QHeaderView):
+    on_copy = QtCore.pyqtSignal(list)
+
+    def __init__(self) -> None:
+        super().__init__(Qt.Orientation.Horizontal, None)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
+        self.setSectionsMovable(True)
+        self.setSectionsClickable(True)
+        self._last_clicked_column = None
+        self.addAction(
+            QtWidgets.QAction(
+                "&Copy whole column", self, triggered=self._on_copy
+            )
+        )
+
+    def contextMenuEvent(self, event: QtGui.QContextMenuEvent | None) -> None:
+        if event is not None:
+            pos = event.pos()
+            self._last_clicked_column = self.logicalIndexAt(pos)
+            menu = QtWidgets.QMenu(self)
+            menu.addActions(self.actions())
+            menu.exec_(event.globalPos())
+
+    def _on_copy(self):
+        model = self.selectionModel()
+        assert model is not None
+        col_idxs = [idx.column() for idx in model.selectedIndexes()]
+        if not col_idxs and self._last_clicked_column is not None:
+            col_idxs = [self._last_clicked_column]
+        self.on_copy.emit(col_idxs)
 
 
 class CustomTableView(QtWidgets.QTableView):
@@ -17,23 +49,14 @@ class CustomTableView(QtWidgets.QTableView):
             contextMenuPolicy=Qt.ActionsContextMenu,
             editTriggers=QtWidgets.QTableView.EditKeyPressed,
         )
-        header = self.horizontalHeader()
-        header.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
-        header.setSectionsMovable(True)
-        header.addAction(
-            QtWidgets.QAction(
-                "&Copy whole column", self, triggered=self._copy_columns
-            )
-        )
+        header = GeraHeaderView()
+        header.on_copy.connect(self._copy_columns)
+        self.setHorizontalHeader(header)
         self._sql_text_edit = sql_text_edit
 
-    def _copy_columns(self):
-        model = self.horizontalHeader().selectionModel()
-        self.verticalHeader()
-        col_idxs = [idx.column() for idx in model.selectedIndexes()]
+    def _copy_columns(self, col_idxs: list[int]):
         model = self.model()
         data = []
-        # header_model = self.horizontalHeader().model()
         data.append(
             [model.headerData(col_idx, Qt.Horizontal) for col_idx in col_idxs]
         )
