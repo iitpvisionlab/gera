@@ -44,7 +44,7 @@ class CustomTableView(QtWidgets.QTableView):
             sortingEnabled=True,
             selectionBehavior=QtWidgets.QTableView.SelectRows
             | QtWidgets.QTableView.SelectColumns,
-            selectionMode=QtWidgets.QTableView.ContiguousSelection,
+            selectionMode=QtWidgets.QTableView.SelectionMode.ExtendedSelection,
             alternatingRowColors=True,
             contextMenuPolicy=Qt.ActionsContextMenu,
             editTriggers=QtWidgets.QTableView.EditKeyPressed,
@@ -54,7 +54,7 @@ class CustomTableView(QtWidgets.QTableView):
         self.setHorizontalHeader(header)
         self._sql_text_edit = sql_text_edit
 
-    def _copy_columns(self, col_idxs: list[int]):
+    def _copy_columns(self, col_idxs: list[int]) -> None:
         model = self.model()
         data = []
         data.append(
@@ -67,7 +67,11 @@ class CustomTableView(QtWidgets.QTableView):
         text = "\n".join("\t".join(row) for row in data)
         QtWidgets.QApplication.clipboard().setText(text)
 
-    def selectionChanged(self, selected, deselected):
+    def selectionChanged(
+        self,
+        selected: QtCore.QItemSelection,
+        deselected: QtCore.QItemSelection,
+    ) -> None:
         tips: set[str] = set()
         for index in selected.indexes():
             val = index.data()
@@ -78,6 +82,31 @@ class CustomTableView(QtWidgets.QTableView):
                 pass
         self._sql_text_edit.setTips(tips)
         super().selectionChanged(selected, deselected)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if event.matches(QtGui.QKeySequence.StandardKey.Copy):
+            self._copy_selection()
+        else:
+            super().keyPressEvent(event)
+
+    def _copy_selection(self):
+        indexes = self.selectedIndexes()
+        if not indexes:
+            return
+        indexes.sort(key=lambda idx: (idx.row(), idx.column()))
+        rows: list[str] = []
+        current_row = indexes[0].row()
+        row_data: list[str] = []
+
+        for idx in indexes:
+            if idx.row() != current_row:
+                rows.append("\t".join(row_data))
+                row_data = []
+                current_row = idx.row()
+            row_data.append(str(idx.data(Qt.DisplayRole)))
+
+        rows.append("\t".join(row_data))
+        QtWidgets.QApplication.clipboard().setText("\n".join(rows))
 
 
 class ReportWindow(QtWidgets.QSplitter):
