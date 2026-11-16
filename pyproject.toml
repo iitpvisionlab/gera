@@ -1,6 +1,6 @@
 [project]
 name = "gera"
-version = "0.1.0"
+dynamic = ["version"]
 authors = [
   { name="Arseniy Terekhin", email="senyai@gmail.com" },
 ]
@@ -23,5 +23,8 @@ requires = [
 build-backend = "setuptools.build_meta"
 [tool.black]
 line-length = 79
+target-version = ["py310"]
 [project.scripts]
 gera = "gera.application:main"
+[tool.setuptools.dynamic]
+version = {attr = "gera.__version__"}
