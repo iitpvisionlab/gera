@@ -37,18 +37,20 @@ def action_for(self, **mod):
 
 
 class MdiArea(QtWidgets.QMdiArea):
-    def __init__(self, parent, button):
+    def __init__(
+        self, parent: QtWidgets.QMainWindow, button: QtWidgets.QPushButton
+    ):
         super(MdiArea, self).__init__(
             parent,
             objectName="mdi_area",
-            viewMode=QtWidgets.QMdiArea.TabbedView,
+            viewMode=QtWidgets.QMdiArea.ViewMode.TabbedView,
         )
         self._button = button
         button.setParent(self)
 
         # Setting elide mode
         self._tab_bar = tab_bar = self.findChild(QtWidgets.QTabBar)
-        tab_bar.setElideMode(Qt.ElideMiddle)
+        tab_bar.setElideMode(Qt.TextElideMode.ElideMiddle)
         tab_bar.setMovable(True)
         tab_bar.setTabsClosable(True)
         tab_bar.currentChanged.connect(self._add_button_space)
@@ -105,17 +107,18 @@ class MdiArea(QtWidgets.QMdiArea):
             "&Cascade", self.cascadeSubWindows, icon=get_icon("cascade")
         )
 
+        SK = QtGui.QKeySequence.StandardKey
         next_act = action(
             "Ne&xt",
             self.activateNextSubWindow,
-            shortcut=QtGui.QKeySequence.NextChild,
+            shortcut=SK.NextChild,
             icon=get_icon("next"),
         )
 
         previous_act = action(
             "Pre&vious",
             self.activatePreviousSubWindow,
-            shortcut=QtGui.QKeySequence.PreviousChild,
+            shortcut=SK.PreviousChild,
             icon=get_icon("prev"),
         )
 
@@ -155,7 +158,7 @@ class MdiArea(QtWidgets.QMdiArea):
             if window is not w:
                 window.close()
 
-    def fullscreen(self, state):
+    def fullscreen(self, state: bool) -> None:
         if state:  # go fullscreen
             self.splitter = self.parent()
             self._splitter_state = self.splitter.saveState()
@@ -168,7 +171,12 @@ class MdiArea(QtWidgets.QMdiArea):
             self.splitter = None
             self.showNormal()
 
-    def add(self, window, new=False, icon=None):
+    def add(
+        self,
+        window: QtWidgets.QWidget,
+        new: bool = False,
+        icon: str | None = None,
+    ) -> None:
         if (
             not new
             and QtWidgets.QApplication.keyboardModifiers() != Qt.AltModifier
@@ -192,9 +200,9 @@ class MdiArea(QtWidgets.QMdiArea):
     def tile_horizontal_rev(self):
         self.tile_horizontal(True)
 
-    def tile_horizontal(self, reverse):
+    def tile_horizontal(self, reverse: bool) -> None:
         windows = self.subWindowList()  # len(windows) != 0 always!
-        height = self.viewport().height() / len(windows)
+        height = self.viewport().height() // len(windows)
         x = 0
         if reverse:
             windows.reverse()
@@ -204,9 +212,9 @@ class MdiArea(QtWidgets.QMdiArea):
             window.move(0, x)
             x += height
 
-    def tile_vertical(self, reverse):
+    def tile_vertical(self, reverse: bool) -> None:
         windows = self.subWindowList()  # len(windows) != 0 always!
-        width = self.width() / len(windows)
+        width = self.width() // len(windows)
         x = 0
         if reverse:
             windows.reverse()
@@ -217,12 +225,12 @@ class MdiArea(QtWidgets.QMdiArea):
             window.move(x, 0)
             x += width
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         # Alt+F4 in fullscreen
         self.fullscreen_act.setChecked(False)
         event.ignore()
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super(MdiArea, self).resizeEvent(event)
         self._add_button_space()
 
@@ -230,9 +238,9 @@ class MdiArea(QtWidgets.QMdiArea):
         if not self.subWindowList():
             self.fullscreen_act.setChecked(False)
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         # Not as action as `Ambiguous shortcut overload: Esc`
-        if event.key() == Qt.Key_Escape and self.isFullScreen():
+        if event.key() == Qt.Key.Key_Escape and self.isFullScreen():
             self.fullscreen_act.setChecked(False)
         else:
             return QtWidgets.QMdiArea.keyPressEvent(self, event)
