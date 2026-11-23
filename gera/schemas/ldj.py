@@ -106,7 +106,8 @@ class LDJSchema(GeraSchema):
             return {}
 
         for statement in statements:
-            q = db.exec_(statement + filter_sql)
+            statement += filter_sql
+            q = db.exec_(statement)
             while q.next():
                 record = q.record()
                 ret.update(
@@ -118,7 +119,7 @@ class LDJSchema(GeraSchema):
             else:
                 error = q.lastError()
                 if error.isValid():
-                    print("error", error.text())
+                    print(f"sql error `{error.text()}` in `{statement}`")
         return ret
 
     def _gera_info_to_actions(
