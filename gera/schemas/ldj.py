@@ -33,16 +33,36 @@ class GeraActionBase(TypedDict):
 
 
 class GeraCopyAction(GeraActionBase):
+    """
+    Context menu action that will allow copying custom text,
+    useful for rerunning experiments in debugger
+    """
+
     action: Literal["copy"]
     text: str
 
 
 class GeraExecuteAction(GeraActionBase):
+    """
+    Context menu action that will execute args. First one will be available on
+    double click
+    """
+
     action: Literal["execute"]
     args: list[str]
 
 
-GeraActions = list[GeraCopyAction | GeraExecuteAction]
+class GeraSQL(GeraActionBase):
+    """
+    Add rows to statistics table. After each statement a 'WHERE' clause will
+    be added.
+    """
+
+    action: Literal["sql"]
+    statements: list[str]
+
+
+GeraActions = list[GeraCopyAction | GeraExecuteAction | GeraSQL]
 
 
 class LDJSchema(GeraSchema):
@@ -68,8 +88,38 @@ class LDJSchema(GeraSchema):
             path,
             lambda db: self._report_to_db(db, path),
             self.on_view_ready,
+            db_statistics=self._db_statistics,
         )
         return report_window
+
+    def _db_statistics(
+        self, db: QtSql.QSqlDatabase, filter: str
+    ) -> dict[str, str]:
+        filter_sql = f" WHERE {filter}" if filter else " "
+        ret: dict[str, str] = {}
+
+        for command in self._gera_info or ():
+            if command["action"] == "sql":
+                statements = command["statements"]
+                break
+        else:
+            return {}
+
+        for statement in statements:
+            q = db.exec_(statement + filter_sql)
+            while q.next():
+                record = q.record()
+                ret.update(
+                    {
+                        record.fieldName(idx): q.value(idx)
+                        for idx in range(record.count())
+                    }
+                )
+            else:
+                error = q.lastError()
+                if error.isValid():
+                    print("error", error.text())
+        return ret
 
     def _gera_info_to_actions(
         self,

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 from PyQt5 import QtCore, QtSql, QtGui, QtWidgets
 from .sql_text_edit import SqlTextEdit
 
@@ -85,12 +85,12 @@ class CustomTableView(QtWidgets.QTableView):
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event.matches(QtGui.QKeySequence.StandardKey.Copy):
-            self._copy_selection()
+            self.copy_selection(self.selectedIndexes())
         else:
             super().keyPressEvent(event)
 
-    def _copy_selection(self):
-        indexes = self.selectedIndexes()
+    @staticmethod
+    def copy_selection(indexes: list[QtCore.QModelIndex]) -> None:
         if not indexes:
             return
         indexes.sort(key=lambda idx: (idx.row(), idx.column()))
@@ -108,6 +108,36 @@ class CustomTableView(QtWidgets.QTableView):
         rows.append("\t".join(row_data))
         QtWidgets.QApplication.clipboard().setText("\n".join(rows))
 
+    if TYPE_CHECKING:
+
+        def model(self) -> QtSql.QSqlTableModel: ...
+
+
+class StatisticsWidget(QtWidgets.QTableWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setSelectionMode(
+            QtWidgets.QTableView.SelectionMode.ExtendedSelection
+        )
+        self.setColumnCount(2)
+        self.setHorizontalHeaderLabels(["Name", "Value"])
+
+    def set_statistics(self, data: dict[str, str]) -> None:
+        self.setRowCount(len(data))
+        for row, (name, value) in enumerate(data.items()):
+            name_item = QtWidgets.QTableWidgetItem(name)
+            value_item = QtWidgets.QTableWidgetItem()
+            value_item.setData(Qt.DisplayRole, value)
+            self.setItem(row, 0, name_item)
+            self.setItem(row, 1, value_item)
+        self.resizeColumnsToContents()
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if event.matches(QtGui.QKeySequence.StandardKey.Copy):
+            CustomTableView.copy_selection(self.selectedIndexes())
+        else:
+            super().keyPressEvent(event)
+
 
 class ReportWindow(QtWidgets.QSplitter):
     def __init__(
@@ -115,11 +145,16 @@ class ReportWindow(QtWidgets.QSplitter):
         title: str,
         report_to_db: Callable[[QtSql.QSqlDatabase], list[str]],
         view_ready: Callable[[CustomTableView], None],
+        db_statistics: Callable[[QtSql.QSqlDatabase, str], dict[str, str]],
     ):
+        """
+        :param view_ready: useful callback to let schema attach context menu
+        """
         super().__init__(Qt.Vertical, windowTitle=title)
         self.setMinimumSize(1, 1)
-        self._db_id = "db-" + str(id(self))
-        self._db = self._create_db(self._db_id)
+        db_id = "db-" + str(id(self))
+        self._db = self._create_db(db_id)
+        self._db_statistics = db_statistics
         keys = report_to_db(self._db)
         (
             where_widget,
@@ -129,7 +164,12 @@ class ReportWindow(QtWidgets.QSplitter):
         ) = self._create_where_widget()
         self._sql_table_view = self._create_sql_table(self._db)
         view_ready(self._sql_table_view)
-        self.addWidget(self._sql_table_view)
+
+        self._statistics_table = StatisticsWidget()
+        self._splitter_h = splitter = QtWidgets.QSplitter()
+        splitter.addWidget(self._sql_table_view)
+        splitter.addWidget(self._statistics_table)
+        self.addWidget(splitter)
         self.addWidget(where_widget)
         self._sql_text_edit.setColumnNames(keys)
         self._sql_text_edit.apply.connect(self._apply)
@@ -138,16 +178,28 @@ class ReportWindow(QtWidgets.QSplitter):
         self._sql_table_view.resizeColumnsToContents()
         if self._sql_table_view.model().rowCount():
             self._sql_table_view.selectRow(0)
+        splitter.setSizes([10000, 0])
+        self._update_stats("")
 
     def _apply(self):
         sql = self._sql_text_edit.toPlainText()
         sql_model = self._sql_table_view.model()
         sql_model.setFilter(sql)
+        self._update_stats(sql)
         err = ""
         if sql_model.lastError().isValid():
             err = "SQL error: " + sql_model.lastError().databaseText()
             sql_model.select()
         self._error_label.setText(err)
+
+    def _update_stats(self, filter: str) -> None:
+        stats = self._db_statistics(self._db, filter)
+        if stats:
+            self._statistics_table.set_statistics(stats)
+            self._statistics_table.setVisible(True)
+            self._splitter_h.setSizes([700, 100])
+        else:
+            self._statistics_table.setVisible(False)
 
     @staticmethod
     def _create_db(connection_name: str):
