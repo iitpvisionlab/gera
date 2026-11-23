@@ -200,13 +200,14 @@ class LDJSchema(GeraSchema):
     def _iter_report(
         self, report: Iterable[dict[str, Any]], rows: list[tuple[str, ...]]
     ) -> Iterator[list[Any]]:
+        supported_types = float | int | str | type(None)  # None must be NULL
         for data in report:
             ret: list[Any] = []
             for row in rows:
                 value = data
                 for key in row:
                     value = value.get(key)
-                if not isinstance(value, (float | int | str)):
+                if not isinstance(value, supported_types):
                     value = repr(value)
                 ret.append(value)
             yield ret
